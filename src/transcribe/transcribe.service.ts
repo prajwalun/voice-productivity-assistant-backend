@@ -1,42 +1,36 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { v4 as uuid } from 'uuid';
-import * as fs from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import axios from 'axios';
+import * as FormData from 'form-data';
+import * as streamifier from 'streamifier';
 
 @Injectable()
 export class TranscribeService {
-  async transcribe(file: Express.Multer.File) {
-    const filename = `${uuid()}.wav`;
-    const filepath = `./temp/${filename}`;
-
+  async transcribe(file: Express.Multer.File): Promise<{ transcription: string }> {
     try {
-      // 1️⃣ Ensure ./temp folder exists
-      fs.mkdirSync('./temp', { recursive: true });
+      const formData = new FormData();
 
-      // 2️⃣ Save uploaded file to disk
-      fs.writeFileSync(filepath, file.buffer);
+      // Convert buffer to stream
+      const stream = streamifier.createReadStream(file.buffer);
 
-      // 3️⃣ Run the Python Whisper script
-      const { stdout } = await execAsync(`python3 transcribe_local.py ${filepath}`);
+      formData.append('file', stream, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'en'); // Optional, for better accuracy
 
-      // 4️⃣ Clean up file after transcription
-      fs.unlinkSync(filepath);
+      const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+      });
 
-      // 5️⃣ Return the transcribed text
       return {
-        transcription: stdout.trim(),
+        transcription: response.data.text.trim(),
       };
-    } catch (error) {
-      console.error('❌ Local Whisper transcription failed:', error.message);
-
-      // Clean up if file exists
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-
+    } catch (error: any) {
+      console.error('❌ Whisper API error:', error.response?.data || error.message);
       throw new InternalServerErrorException('Failed to transcribe audio');
     }
   }
