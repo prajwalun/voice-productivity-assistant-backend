@@ -3,46 +3,82 @@ import axios from 'axios';
 
 @Injectable()
 export class OpenaiService {
-  async generateSmartTitle(transcription: string): Promise<string> {
+  private readonly OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+  private readonly API_KEY = process.env.OPENAI_API_KEY;
+  private readonly ORG_ID = process.env.OPENAI_ORG_ID;
+
+  private async callOpenAI(messages: any[]): Promise<string> {
     try {
       const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
+        this.OPENAI_API_URL,
         {
           model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that summarizes tasks.',
-            },
-            {
-              role: 'user',
-              content: `Generate a short, smart task title based on this transcription:\n\n"${transcription}"`,
-            },
-          ],
+          messages,
           temperature: 0.7,
         },
         {
           headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            Authorization: `Bearer ${this.API_KEY}`,
             'Content-Type': 'application/json',
-            ...(process.env.OPENAI_ORG_ID && {
-              'OpenAI-Organization': process.env.OPENAI_ORG_ID,
-            }),
+            ...(this.ORG_ID && { 'OpenAI-Organization': this.ORG_ID }),
           },
         }
       );
 
-      const choice = response.data.choices?.[0]?.message?.content;
-      if (!choice) {
-        throw new Error('No title returned from GPT');
+      const content = response.data.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error('No response returned from GPT');
       }
 
-      const title = choice.trim();
-    
-      return title;
+      return content;
     } catch (error: any) {
       console.error('❌ GPT API error:', error.response?.data || error.message);
-      throw new InternalServerErrorException('Failed to generate smart title');
+      throw new InternalServerErrorException('OpenAI GPT request failed');
+    }
+  }
+
+  // 🧠 Generate Smart Task Title
+  async generateSmartTitle(transcription: string): Promise<string> {
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant that summarizes tasks.',
+      },
+      {
+        role: 'user',
+        content: `Generate a short, smart, human-friendly task title for this:\n\n"${transcription}"`,
+      },
+    ];
+    return this.callOpenAI(messages);
+  }
+
+  // 🌟 Generate Encouragement Tip and Quote
+  async generateEncouragement(transcription: string): Promise<{ tip: string; quote: string }> {
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a motivational assistant that encourages users to stay productive.',
+      },
+      {
+        role: 'user',
+        content: `Given this transcription:\n\n"${transcription}"\n\nReturn a JSON with two fields: "tip" (a useful productivity tip) and "quote" (a motivational quote).`,
+      },
+    ];
+
+    const raw = await this.callOpenAI(messages);
+
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        tip: parsed.tip || 'Stay focused and keep moving forward.',
+        quote: parsed.quote || 'Success is the sum of small efforts repeated daily.',
+      };
+    } catch {
+      console.warn('⚠️ GPT did not return valid JSON. Falling back to defaults.');
+      return {
+        tip: 'Stay focused and take breaks to boost productivity.',
+        quote: 'Success is the sum of small efforts, repeated day in and day out.',
+      };
     }
   }
 }

@@ -35,7 +35,6 @@ export class TranscribeController {
   async transcribe(@UploadedFile() file: Express.Multer.File, @Req() req) {
     const userId = req.user.uid;
 
-    // Validate file presence
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
@@ -58,14 +57,17 @@ export class TranscribeController {
       );
     }
 
-    // 1️⃣ Transcribe
+    // 🎙️ Transcribe the audio
     const result = await this.transcribeService.transcribe(file);
     const fullText = result.transcription.trim();
 
-    // 2️⃣ Generate smart title
+    // 🧠 Generate a smart title from GPT
     const smartTitle = await this.openaiService.generateSmartTitle(fullText);
 
-    // 3️⃣ Create task
+    // 💡 Get motivational tip and quote
+    const encouragement = await this.openaiService.generateEncouragement(fullText);
+
+    // ✅ Create the task
     const newTask = this.tasksService.createTask(
       { title: smartTitle, description: fullText },
       userId,
@@ -74,6 +76,7 @@ export class TranscribeController {
     return {
       transcription: fullText,
       title: smartTitle,
+      encouragement, // { tip, quote }
       task: newTask,
     };
   }
