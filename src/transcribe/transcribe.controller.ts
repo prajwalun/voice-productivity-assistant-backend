@@ -57,27 +57,36 @@ export class TranscribeController {
       );
     }
 
-    // 🎙️ Transcribe the audio
+    // 🎙️ Step 1: Transcribe the audio
     const result = await this.transcribeService.transcribe(file);
     const fullText = result.transcription.trim();
 
-    // 🧠 Generate a smart title from GPT
+    // 🤖 Step 2: Generate a smart title from GPT
     const smartTitle = await this.openaiService.generateSmartTitle(fullText);
 
-    // 💡 Get motivational tip and quote
-    const encouragement = await this.openaiService.generateEncouragement(fullText);
-
-    // ✅ Create the task
+    // ✅ Step 3: Create task
     const newTask = this.tasksService.createTask(
       { title: smartTitle, description: fullText },
       userId,
     );
 
+    // 💡 Step 4: Get encouragement only if enabled or randomly selected
+    const encouragement: { tip?: string; quote?: string } = {};
+
+    const showTips = req.user.settings?.showTips;
+    const showQuote = Math.floor(Math.random() * 5) === 0; // 1 in 5 chance
+
+    if (showTips || showQuote) {
+      const result = await this.openaiService.generateEncouragement(fullText);
+      if (showTips) encouragement.tip = result.tip;
+      if (showQuote) encouragement.quote = result.quote;
+    }
+
     return {
       transcription: fullText,
       title: smartTitle,
-      encouragement, // { tip, quote }
       task: newTask,
+      encouragement,
     };
   }
 }

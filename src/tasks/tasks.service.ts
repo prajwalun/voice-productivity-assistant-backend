@@ -8,15 +8,28 @@ export class TasksService {
   private tasksByUser: { [userId: string]: Task[] } = {};
 
   createTask(dto: CreateTaskDto, userId: string): Task {
+    const userTasks = this.tasksByUser[userId] || [];
+
     const task: Task = {
       id: uuidv4(),
       title: dto.title,
-      description: dto.description,
+      description: dto.description || '',
       completed: false,
       createdAt: new Date(),
       userId,
     };
 
+    // 💡 Optionally add productivity tip
+    if (dto.tip) {
+      (task as any).tip = dto.tip;
+    }
+
+    // ✨ Occasionally add motivational quote (e.g., every 5th task)
+    if ((userTasks.length + 1) % 5 === 0 && dto.quote) {
+      (task as any).quote = dto.quote;
+    }
+
+    // Save task
     if (!this.tasksByUser[userId]) {
       this.tasksByUser[userId] = [];
     }

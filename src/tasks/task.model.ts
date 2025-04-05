@@ -1,9 +1,12 @@
 export interface Task {
-    id: string;
-    title: string;         // ✅ Short summary (5 words)
-    description: string;   // ✅ Full transcript
-    completed: boolean;
-    createdAt: Date;
-    userId: string;
-  }
-  
+  id: string;
+  title: string;         // ✅ Smart GPT-generated title
+  description: string;   // ✅ Full transcript from audio
+  completed: boolean;
+  createdAt: Date;
+  userId: string;
+
+  // ✅ Optional GPT-generated content
+  tip?: string;          // 💡 Productivity tip
+  quote?: string;        // 🧠 Motivational quote
+}
