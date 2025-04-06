@@ -1,16 +1,17 @@
-import sys
 from faster_whisper import WhisperModel
+import sys
 
-# Path to audio file
+# Load audio file path from CLI args
 audio_path = sys.argv[1]
 
-# Load model (change "tiny" to "base", "medium", "large" if you want better quality)
-model = WhisperModel("tiny", compute_type="int8")
+# Initialize model (can be moved to faster models like 'base' or 'tiny')
+model = WhisperModel("base", compute_type="auto")
 
-segments, info = model.transcribe(audio_path)
+# Transcribe
+segments, _ = model.transcribe(audio_path)
 
-full_text = ""
-for segment in segments:
-    full_text += segment.text + " "
+# Combine transcribed segments
+transcription = " ".join(segment.text for segment in segments)
 
-print(full_text.strip())
+# Print to stdout for NestJS to capture
+print(transcription)

@@ -6,8 +6,6 @@
 .env
 firebase-service-account.json
 
-OPENAI_API_KEY=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
-
 # Logs
 logs
 *.log
