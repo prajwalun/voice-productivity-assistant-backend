@@ -1,54 +1,42 @@
 import { Injectable } from '@nestjs/common';
-import { Task } from './task.model';
-import { v4 as uuidv4 } from 'uuid';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { Task } from '@prisma/client';
 
 @Injectable()
 export class TasksService {
-  private tasksByUser: { [userId: string]: Task[] } = {};
+  constructor(private readonly prisma: PrismaService) {}
 
-  createTask(dto: CreateTaskDto, userId: string): Task {
-    const userTasks = this.tasksByUser[userId] || [];
+  // ✅ Create a new task and store it in the DB
+  async createTask(dto: CreateTaskDto, userId: string): Promise<Task> {
+    return this.prisma.task.create({
+      data: {
+        userId,
+        title: dto.title,
+        description: dto.description || '',
+        completed: false,
+      },
+    });
+  }
+  
 
-    const task: Task = {
-      id: uuidv4(),
-      title: dto.title,
-      description: dto.description || '',
-      completed: false,
-      createdAt: new Date(),
-      userId,
-    };
-
-    // 💡 Optionally add productivity tip
-    if (dto.tip) {
-      (task as any).tip = dto.tip;
-    }
-
-    // ✨ Occasionally add motivational quote (e.g., every 5th task)
-    if ((userTasks.length + 1) % 5 === 0 && dto.quote) {
-      (task as any).quote = dto.quote;
-    }
-
-    // Save task
-    if (!this.tasksByUser[userId]) {
-      this.tasksByUser[userId] = [];
-    }
-
-    this.tasksByUser[userId].push(task);
-    return task;
+  // ✅ Fetch all tasks for the user
+  async getAllTasks(userId: string): Promise<Task[]> {
+    return this.prisma.task.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
-  getAllTasks(userId: string): Task[] {
-    return this.tasksByUser[userId] || [];
-  }
+  // ✅ Delete a task only if it belongs to the user
+  async deleteTask(id: string, userId: string): Promise<boolean> {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+    });
 
-  deleteTask(id: string, userId: string): boolean {
-    const tasks = this.tasksByUser[userId] || [];
-    const index = tasks.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      tasks.splice(index, 1);
-      return true;
-    }
-    return false;
+    if (!task || task.userId !== userId) return false;
+
+    await this.prisma.task.delete({ where: { id } });
+    return true;
   }
 }

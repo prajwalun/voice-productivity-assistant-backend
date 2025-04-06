@@ -13,6 +13,7 @@ import { TasksService } from '../tasks/tasks.service';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
 import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import { OpenaiService } from '../openai/openai.service';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service'; // ✅
 
 const MAX_FILE_SIZE_MB = 10;
 const multerOptions: MulterOptions = {
@@ -27,6 +28,7 @@ export class TranscribeController {
     private readonly transcribeService: TranscribeService,
     private readonly tasksService: TasksService,
     private readonly openaiService: OpenaiService,
+    private readonly userPreferencesService: UserPreferencesService, // ✅
   ) {}
 
   @UseGuards(FirebaseAuthGuard)
@@ -65,16 +67,19 @@ export class TranscribeController {
     const smartTitle = await this.openaiService.generateSmartTitle(fullText);
 
     // ✅ Step 3: Create task
-    const newTask = this.tasksService.createTask(
-      { title: smartTitle, description: fullText },
-      userId,
-    );
+const newTask = await this.tasksService.createTask(
+  { title: smartTitle, description: fullText },
+  userId,
+);
 
-    // 💡 Step 4: Get encouragement only if enabled or randomly selected
+
+    // 💾 Step 4: Fetch user preferences
+    const prefs = await this.userPreferencesService.getOrCreatePreferences(userId);
+
+    // 💡 Step 5: Conditionally add encouragement
     const encouragement: { tip?: string; quote?: string } = {};
-
-    const showTips = req.user.settings?.showTips;
-    const showQuote = Math.floor(Math.random() * 5) === 0; // 1 in 5 chance
+    const showTips = prefs.showTips;
+    const showQuote = Math.floor(Math.random() * 5) === 0;
 
     if (showTips || showQuote) {
       const result = await this.openaiService.generateEncouragement(fullText);
